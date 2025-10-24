@@ -1,0 +1,4 @@
+tty2::respawn:/usr/bin/tdm_toggle
+tty3::respawn:/usr/bin/tdm_on
+tty4::respawn:/usr/bin/tdm_off
+tty5::respawn:/sbin/poweroff
