@@ -56,6 +56,27 @@ Die beiden extrahierten eingebetteten Konfigurationen stehen in `boot-reference/
 - Das Backup enthält private Hostschlüssel und Passwortdaten und darf nicht
   unverändert in das öffentliche Repository übernommen werden.
 
+## Konkrete TDM-Pfadkonflikte
+
+Die letzten Einträge des aktiven `tce/mydata.tgz` enthalten:
+
+| Pfad | Typ / Ziel |
+| --- | --- |
+| `/usr/local/bin/tdm_on` | Neuere reguläre Datei |
+| `/usr/local/bin/tdm_off` | Neuere reguläre Datei |
+| `/usr/local/bin/tdm_toggle` | Neuere reguläre Datei |
+| `/usr/bin/tdm_on` | Symlink auf `/tmp/tcloop/tdm/usr/bin/tdm_on` (alte Erweiterung) |
+| `/usr/bin/tdm_off` | Symlink auf `/usr/local/bin/tdm_off` |
+| `/usr/bin/tdm_toggle` | Symlink auf `/usr/local/bin/tdm_toggle` |
+| `/usr/bin/SmcDumpKey` | Symlink auf `/tmp/tcloop/tdm/usr/bin/SmcDumpKey` (alte Erweiterung) |
+
+Damit vermischten Aufrufe unter `/usr/bin` alte und neue Implementierungen.
+Die wiederhergestellte inittab und bootlocal.sh verwenden dagegen ausdrücklich
+`/usr/local/bin`. Im bereinigten Repository ist deshalb `/usr/local/bin` der
+zentrale Installationspfad für alle TDM-Programme einschließlich Status,
+Shutdown und SmcDumpKey. Das Zusatz-Initramfs liefert sie dort aus; weder die
+alte Erweiterung noch deren `/usr/bin`-Verknüpfungen werden übernommen.
+
 ## Bereinigter Repository-Stand
 
 Der bekannte `BOOTX64.EFI` bleibt erhalten; `/grub.cfg` ist die zentrale Konfiguration.
