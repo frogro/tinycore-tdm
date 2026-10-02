@@ -3,7 +3,7 @@
 Zielgerät: **iMac 27 Zoll, Ende 2009**, Target Display Mode (TDM).
 Die TDM-Programme wurden vom funktionierenden USB-Stick des Besitzers wiederhergestellt.
 Sie waren im ursprünglichen GitHub-Upload nicht enthalten, sondern in `tce/mydata.tgz`.
-Der neue, bereinigte Repository-Build muss noch auf dem iMac getestet werden.
+Der bereinigte Build bootet in QEMU bis zur Konsole; der iMac-Test steht noch aus.
 DDC/CI-Helligkeitssteuerung und TDM-Umschaltung sind unterschiedliche Funktionen.
 
 ## USB-Stick unter Linux erstellen
@@ -155,5 +155,5 @@ Passwortdateien, private SSH-Hostschlüssel, Shell-Historien und persönliche Da
 vom Stick wurden nicht übernommen. SSH und deutsche Keymaps bleiben optionale
 Erweiterungen; für die direkte SMC-Umschaltung reichen die enthaltenen Programme.
 Der funktionierende Originalstick wurde bei der Wiederherstellung nur gelesen.
-Die integrierte neue Fassung ist automatisiert geprüft, aber noch nicht auf dem
-iMac gebootet worden.
+Die integrierte Fassung wurde automatisiert und mit QEMU/OVMF geprüft, aber noch
+nicht auf dem iMac gebootet. Ergebnisse: [QEMU-Boottest](docs/qemu-test.md).

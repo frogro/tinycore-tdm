@@ -86,7 +86,7 @@ else
 fi
 
 hdr "TDM-Befehle vorhanden?"
-for c in /usr/bin/tdm_on /usr/bin/tdm_off /usr/bin/tdm_toggle; do
+for c in /usr/local/bin/tdm_on /usr/local/bin/tdm_off /usr/local/bin/tdm_toggle; do
   if [ -x "$c" ]; then
     printf "%s: vorhanden\n" "$c" | tee -a "$out"
   else
