@@ -36,6 +36,36 @@ bleiben im ignorierten lokalen qemu-Verzeichnis und werden nicht veröffentlicht
   die Konsole mit `text tdm_safe=1`. `/var/log/bootlocal.log` existiert danach
   nicht; die projektspezifischen Startaufgaben wurden übersprungen.
 
+## Ausgeführte TDM-Pfade im Originalsystem
+
+Die Originalreferenz wurde erneut gebootet. Nach dem Boot wurden ausschließlich
+im flüchtigen VM-Dateisystem die drei Skripte unter `/usr/bin` und
+`/usr/local/bin` durch unterscheidbare Marker-Skripte ersetzt. Init und die
+wiederhergestellte inittab blieben unverändert. Über QEMU-Tastaturereignisse wurden
+die Konsolen ausgewählt und jeweils Enter gedrückt:
+
+| Tastatur | Ausgeführter Pfad (Marker nachgewiesen) |
+| --- | --- |
+| Alt+F3, Enter | `/usr/local/bin/tdm_on` |
+| Alt+F4, Enter | `/usr/local/bin/tdm_off` |
+| Alt+F2, Enter | `/usr/local/bin/tdm_toggle` |
+
+Auch `command -v` löst die drei Befehle in dieser Sitzung nach `/usr/local/bin`
+auf. Das bestätigt die tatsächlich verwendeten Einstiegspfade des vorhandenen
+Stickstands, nicht nur den Text einer Konfigurationsdatei. Der ursprüngliche
+Aufruf der SMC-Programme wurde separat im vorangegangenen Boottest beobachtet;
+die Markerprüfung selbst führt keine Hardwareumschaltung aus.
+
+Das alte `SmcDumpKey` aus `tdm.tcz` ist ein 32-Bit-i386-ELF mit Interpreter
+`/lib/ld-linux.so.2`. Dieser Loader fehlt im gestarteten Originalsystem. Die
+wiederhergestellte Version unter `/usr/local/bin` ist x86-64 mit
+`/lib/ld-linux-x86-64.so.2`. Damit ist der alte `/usr/bin/SmcDumpKey`-Pfad in diesem
+System nicht ausführbar. Ein historisch anders konfigurierter Stickstand lässt
+sich damit nicht beurteilen.
+
+Die VM wurde ohne Dateibackup beendet; die Marker wurden weder auf den
+Originalstick noch in das schreibgeschützte Referenzimage übernommen.
+
 ## Grenzen
 
 OVMF ist keine iMac-Firmware. Der Test bestätigt den Standard-USB-EFI-Bootpfad
