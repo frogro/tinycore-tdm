@@ -83,5 +83,5 @@ Der bekannte `BOOTX64.EFI` bleibt erhalten; `/grub.cfg` ist die zentrale Konfigu
 Das Zusatz-Initramfs enthält nur die ausgewählten Skripte und das SMC-Programm.
 Der Altbestand `tdm.tcz` und das persönliche Backup werden nicht ausgeliefert.
 Autostart wird nur mit `tdm_autostart=1` ausgeführt. Safe Console Mode überspringt
-projektspezifische Startaufgaben. Die übrigen EFI-Dateien werden vor einem realen
-Bootvergleich nicht aus dem Repository entfernt. Am Originalstick wurde nichts geändert.
+projektspezifische Startaufgaben. Das bereinigte Repository liefert nur den in QEMU getesteten BOOTX64.EFI aus;
+die ungenutzte alternative EFI-Kopie wurde entfernt. Am Originalstick wurde nichts geändert.

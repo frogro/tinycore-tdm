@@ -1,159 +1,186 @@
-# TinyCore Display-Diagnose / TDM-Vorbereitung
+# TinyCore TDM für den iMac 27″ (Ende 2009)
 
-Zielgerät: **iMac 27 Zoll, Ende 2009**, Target Display Mode (TDM).
-Die TDM-Programme wurden vom funktionierenden USB-Stick des Besitzers wiederhergestellt.
-Sie waren im ursprünglichen GitHub-Upload nicht enthalten, sondern in `tce/mydata.tgz`.
-Der bereinigte Build bootet in QEMU bis zur Konsole; der iMac-Test steht noch aus.
-DDC/CI-Helligkeitssteuerung und TDM-Umschaltung sind unterschiedliche Funktionen.
+Ein kleines Linux-Bootsystem für den **Target Display Mode**: Der iMac kann über
+seinen Mini-DisplayPort-Eingang als Bildschirm verwendet werden. Dieses Repository
+enthält den USB-Installer, EFI-Bootloader, TinyCore und die vom funktionierenden
+Originalstick wiederhergestellten **64-Bit-SMC-Programme**.
 
-## USB-Stick unter Linux erstellen
+**Status:** Originalstick laut Besitzer funktionsfähig. Originalkopie und
+bereinigter Stand booten in QEMU/UEFI bis zur Konsole; auch der Konsolenmodus ist
+geprüft. Die bereinigte Fassung und die Status-/Toggle-Anpassung müssen noch am
+realen iMac getestet werden. QEMU kann die physische Displayumschaltung nicht testen.
 
-Der Installer erstellt direkt einen bootfähigen USB-Stick aus den Dateien im
-Repository; eine separate `.img`-Datei ist nicht erforderlich. **Alle Daten auf
-dem gewählten USB-Laufwerk werden gelöscht.** Andere USB-Laufwerke möglichst
-vorher abziehen. Ein Stick ab 512 MiB genügt für den enthaltenen Stand.
+## USB-Stick unter Linux installieren
 
-Unter Debian/Ubuntu die benötigten Werkzeuge installieren:
+Benötigt werden ein Linux-Rechner, Internet, Python 3 und ein USB-Stick ab **512 MiB**.
+Der Download der fünf Bootdateien umfasst ungefähr **22 MiB**. Das Repository muss
+nicht geklont werden; eine zusätzliche Image-Datei ist nicht nötig.
+
+**Die Installation löscht alle Partitionen und Daten des ausgewählten USB-Laufwerks.**
+Den funktionierenden Originalstick als Referenz behalten und einen zweiten Stick
+verwenden. Der Installer zeigt Gerät, Größe, Modell und Seriennummer und verlangt
+vor dem ersten Schreibzugriff die Eingabe `LOESCHEN /dev/sdX`.
+
+### 1. Werkzeuge installieren und Installer herunterladen
+
+Debian/Ubuntu:
 
 ```sh
-sudo apt install python3 util-linux parted dosfstools udev
+sudo apt install python3 curl ca-certificates util-linux parted dosfstools udev
+curl --fail --location --output install-usb.py \
+  https://raw.githubusercontent.com/frogro/tinycore-tdm/main/scripts/install-usb.py
 ```
 
-Im Repository-Verzeichnis:
+Auf anderen Linux-Distributionen die entsprechenden Pakete installieren.
+Der Installer benötigt keine zusätzlichen Python-Pakete.
+
+### 2. Zielgerät bestimmen
 
 ```sh
-# Geräte mit Modell, Größe, Seriennummer und belegten Partitionen anzeigen:
-python3 scripts/install-usb.py --list
-
-# /dev/sdX durch das tatsächlich gewünschte ganze USB-Laufwerk ersetzen.
-# Eingehängte Partitionen vorher über den Dateimanager aushängen.
-python3 scripts/install-usb.py --device /dev/sdX --dry-run
-sudo python3 scripts/install-usb.py --device /dev/sdX
+python3 install-usb.py --list
 ```
 
-Der Probelauf schreibt nichts. Die Installation verlangt zusätzlich die genaue
-Eingabe `LOESCHEN /dev/sdX`. Sie verweigert interne Laufwerke, einzelne Partitionen,
-eingehängte Geräte, aktiven Swap und verwendete Mapper-/RAID-Geräte. Sie hängt
-vorhandene Dateisysteme nicht automatisch aus. Der Installer legt eine
-GPT-Partitionstabelle mit einer FAT32-EFI-Systempartition und Label `TINYCORE` an,
-kopiert die Bootdateien, vergleicht SHA-256-Prüfsummen und hängt den Stick aus.
-Bei einem Fehler nach Beginn der Partitionierung kann der Stick unvollständig
-sein; nach Behebung der Ursache die Installation erneut starten.
+**`/dev/sdX` in den folgenden Beispielen durch das richtige ganze USB-Laufwerk
+ersetzen**, beispielsweise `/dev/sdc`. Keine Partitionsnummer anhängen. Die
+angezeigten Partitionen dieses Sticks zunächst im Dateimanager aushängen.
 
-Am iMac beim Einschalten **Alt/Option** gedrückt halten und den USB-EFI-Boot wählen.
-Falls das mitgelieferte GRUB zunächst sein Suchmenü zeigt, den Eintrag zum Finden
-von `grub.cfg` auswählen. Der Installer wurde mit simulierten Geräten getestet;
-ein realer Schreib- und Bootversuch am iMac steht noch aus.
+### 3. Prüfen und installieren
 
-## Funktionsumfang
+```sh
+# Lädt und prüft die Dateien, schreibt aber nichts auf den Stick:
+python3 install-usb.py --device /dev/sdX --dry-run
 
-| Funktion | Stand |
-| --- | --- |
-| Linux-USB-Installer mit Probelauf und Geräteprüfung | Implementiert, automatisiert getestet |
-| TinyCore-Boot mit Diagnose- und Konsolenmodus | Konfiguriert, iMac-Bootprüfung offen |
-| Backlight-, I2C-, DRM- und EDID-Diagnose | Implementiert; Ergebnisse hardwareabhängig |
-| DDC/CI-Erkennung und Helligkeitsabfrage | Optional mit installiertem `ddcutil` |
-| SSH | Optional mit installiertem und konfiguriertem Dropbear |
-| Wechsel in TDM und zurück | Programme vom funktionierenden Stick übernommen |
-| Tastenkürzel oder automatischer TDM-Start | Wiederhergestellt; siehe Bedienung |
+# Lädt die Dateien erneut und verlangt danach die Löschbestätigung:
+sudo python3 install-usb.py --device /dev/sdX
+```
 
-## TDM bedienen
+Der Installer:
 
-Die Tastatur muss am **iMac** angeschlossen sein. In der Linux-Textkonsole:
+1. verweigert interne Laufwerke, einzelne Partitionen, schreibgeschützte oder
+   eingehängte Geräte sowie aktiven Swap und verwendete Mapper-/RAID-Geräte;
+2. löst `main` einmal zu einer Commit-ID auf und lädt alle Dateien genau dieses
+   Standes von GitHub;
+3. prüft Dateigröße und SHA-256 anhand von `install-manifest.json`, bevor er nach
+   der Löschbestätigung fragt;
+4. erstellt GPT und eine FAT32-EFI-Systempartition mit dem Label **TINYCORE**;
+5. kopiert die Bootdateien, erstellt `tce/`, prüft die kopierten Dateien und hängt
+   den Stick aus.
 
-| Aktion | Tastatur | Konsole/SSH |
+Ein Download- oder Prüfsummenfehler beendet den Vorgang vor der Partitionierung.
+Ein Fehler nach Beginn der Partitionierung kann einen unvollständigen Stick
+hinterlassen; nach Behebung der Ursache erneut installieren. Vorhandene Geräte
+werden niemals automatisch ausgehängt. Die Prüfsummen erkennen beschädigte oder
+vermischte Dateien; sie sind keine unabhängige Signatur des Repository-Inhalts.
+
+### Nur herunterladen oder offline installieren
+
+```sh
+# Neues Zielverzeichnis angeben; bestehende Verzeichnisse werden nicht überschrieben:
+python3 install-usb.py --download-only downloaded-payload
+
+# Danach ohne Internet installieren:
+sudo python3 install-usb.py --source downloaded-payload --device /dev/sdX
+```
+
+Mit `--ref <Commit-ID>` lässt sich ein bestimmter Stand installieren oder
+herunterladen. Ohne diese Option wird `main` verwendet. Der Downloadordner enthält
+`SOURCE-COMMIT.txt` zur späteren Zuordnung. `--source` funktioniert ebenfalls mit
+einem vollständigen lokalen Checkout und aktuellem Manifest.
+
+## Am iMac starten
+
+1. USB-Stick und eine Tastatur am **iMac** anschließen.
+2. Beim Einschalten **Alt/Option** halten und den USB-EFI-Eintrag wählen.
+3. Der enthaltene GRUB sucht automatisch `/grub.cfg`. Falls sein Suchmenü sichtbar
+   bleibt, „Find /grub.cfg …“ wählen.
+4. **TDM Auto-Start** führt die Startdiagnose aus und ruft nach weiteren zehn
+   Sekunden `tdm_on` auf. Die gesamte Bootzeit ist länger als zehn Sekunden.
+5. **Safe Console Mode** startet ohne projektspezifische Dienste und ohne
+   TDM-Autostart. Manuelles Umschalten bleibt möglich.
+
+Der 2009er-iMac benötigt ein geeignetes **DisplayPort-Signal** am Mini-DisplayPort.
+Die Mini-DisplayPort-Buchse dieses Modells ist kein Thunderbolt-Anschluss.
+
+## TDM einschalten und zurückschalten
+
+Die Tastatur muss am iMac angeschlossen sein. In der Linux-Textkonsole:
+
+| Aktion | Tastatur | Befehl in der Konsole |
 | --- | --- | --- |
-| TDM einschalten | Alt+F3, danach Enter | `sudo /usr/local/bin/tdm_on` |
-| Zur internen Anzeige zurück | Alt+F4, danach Enter | `sudo /usr/local/bin/tdm_off` |
+| TDM einschalten | **Alt+F3**, danach **Enter** | `sudo /usr/local/bin/tdm_on` |
+| Zur internen Anzeige zurück | **Alt+F4**, danach **Enter** | `sudo /usr/local/bin/tdm_off` |
 | Umschalten | Alt+F2, danach Enter | `sudo /usr/local/bin/tdm_toggle` |
 | Status abfragen | — | `sudo /usr/local/bin/tdm_status` |
 | Herunterfahren | Alt+F5, danach Enter | `sudo /usr/local/bin/tdm_shutdown` |
+| Normale Konsole auswählen | Alt+F1 | — |
 
-Je nach Tastatur zusätzlich Fn drücken. Unter einer grafischen Sitzung kann
-Strg+Alt+Fn erforderlich sein. `askfirst` verlangt Enter vor dem Befehl; die
-Befehle werden nicht automatisch durch Init ausgeführt.
+Je nach Tastatur zusätzlich **Fn** drücken. Enter ist erforderlich, weil die
+Konsolen `askfirst` verwenden. Beim externen Bildsignal können die Konsolentasten
+blind bedient werden. Für den ersten Hardwaretest die expliziten ON-/OFF-Befehle
+verwenden: Die vom Stick übernommene Statusinterpretation (`MVMR=0x02` als aktiv)
+ist noch nicht am Gerät bestätigt. Die Statusabfrage wurde auf reines Lesen
+korrigiert; der alte Aufruf schrieb bei jeder Abfrage zusätzlich `MVMR=2`.
 
-Das erste GRUB-Menü aktiviert TDM nach den Startaufgaben und zehn Sekunden Wartezeit.
-**Safe Console Mode** aktiviert TDM nicht automatisch; manuelles Umschalten bleibt möglich.
-Die virtuelle Konsole kann auch bei externem Bildsignal blind ausgewählt werden.
+Alle TDM-Programme liegen einheitlich unter **`/usr/local/bin`**. Die alten
+`/usr/bin`-Varianten aus `tdm.tcz` und die alte 32-Bit-SMC-Binärdatei werden nicht
+installiert. Die tatsächlichen Konsolenaufrufe des Originalstands wurden in QEMU
+mit Markern nachverfolgt; sie verwenden ebenfalls `/usr/local/bin`.
 
-`SmcDumpKey` steuert den Apple-SMC: Einschalten schreibt `MVHR=1`, danach `MVMR=2`;
-Ausschalten schreibt `MVHR=0`, danach `MVMR=2`. Beim Ausschalten wird `applesmc`
-wieder geladen und, falls verfügbar, auf Konsole 1 gewechselt. Vor jedem erneuten
-Einschalten wird der Treiber entladen. `xrandr` ist optional.
+## Diagnose, Tastaturlayout und SSH
 
-Die vom Stick übernommene Statusinterpretation behandelt `MVMR=0x02` als aktiv.
-Die Statusabfrage wurde auf reines Lesen korrigiert: Der alte Aufruf schrieb bei
-jeder Abfrage zusätzlich `MVMR=2`. Status und Toggle müssen deshalb am Gerät geprüft
-werden; die expliziten Ein-/Aus-Befehle stehen unabhängig davon zur Verfügung.
+- Display-, Backlight-, I2C- und EDID-Diagnose ist enthalten. Sie schaltet den
+  Eingang nicht um; TDM verwendet die separate SMC-Steuerung.
+- **SSH, `ddcutil` und deutsche Keymaps sind nicht vorinstalliert.** Ohne Keymap
+  gilt das US-Tastaturlayout. Die TDM-Konsolentasten benötigen diese Pakete nicht.
+- Passende TinyCore-15.x-x86_64-Erweiterungen können mit Abhängigkeiten unter
+  `tce/optional/` und Einträgen in `tce/onboot.lst` ergänzt werden.
+- Ist Dropbear installiert, versucht der normale Start ihn zu starten. Zuerst
+  individuelle Zugangsdaten bzw. Schlüssel konfigurieren; keine Zugangsdaten des
+  alten Sticks übernehmen. Im Safe Console Mode wird er nicht durch bootlocal gestartet.
 
-## Booten
+Logs liegen unter `/var/log/bootlocal.log`, `/var/log/ddc_diag_*.txt` und
+`/home/tc/ddc_diag_*.txt`. Bei persistentem TCE-Verzeichnis wird außerdem
+`tce/ddc_diag_last.txt` auf dem Stick gespeichert. RAM-Logs verschwinden beim Neustart.
 
-Die Partition muss das Dateisystemlabel `TINYCORE` tragen. Auf einem bereits
-UEFI-bootfähigen Stick müssen `EFI/`, `boot/`, `grub.cfg` und `tce/` im
-Wurzelverzeichnis liegen. Dieses Repository ist kein fertiges Datenträger-Image.
+## Aufbau und Entwicklung
 
-GRUB lädt das originale `boot/corepure64.gz` und danach `boot/custom.gz`.
-Das zweite Initramfs enthält die korrigierte `etc/inittab` sowie die beiden
-Skripte aus `opt/`, jeweils mit den benötigten Linux-Dateirechten. Die losen
-Dateien auf dem Stick allein würden TinyCores RAM-Dateisystem nicht verändern.
+```text
+EFI/BOOT/BOOTX64.EFI       Einziger ausgelieferter EFI-Bootloader
+boot/vmlinuz              TinyCore-64-Kernel
+boot/corepure64.gz         Basis-Initramfs
+boot/custom.gz            Reproduzierbares Zusatz-Initramfs mit TDM und Startdateien
+grub.cfg                  Zentrale Bootkonfiguration
+etc/ und opt/             Quellen für Startkonfiguration und Diagnose
+usr/local/bin/            TDM-Skripte und 64-Bit-SmcDumpKey
+src/smc/                  Zugehöriger C-Quellcode und GPLv2-Lizenz
+scripts/install-usb.py     Eigenständig verwendbarer GitHub-/USB-Installer
+install-manifest.json     Dateiliste, Größen und SHA-256 für die Installation
+```
 
-- **TDM Auto-Start** startet Diagnose, optional SSH und danach TDM.
-- **Safe Console Mode** überspringt `bootlocal.sh`; TinyCores normale
-  Initialisierung und DHCP bleiben aktiv.
-- Die virtuellen Konsolen verwenden die oben beschriebenen TDM-Befehle mit Enter-Bestätigung.
-
-Änderungen an `opt/` oder `etc/inittab` erfordern einen Neubau:
+Die losen `etc/`- und `opt/`-Dateien werden nicht direkt vom Stick geladen. GRUB
+lädt das Basis- und anschließend das Zusatz-Initramfs. Nach Änderungen:
 
 ```sh
 python3 scripts/build-overlay.py
+python3 scripts/build-manifest.py
 python3 -m unittest discover -s tests -v
 ```
 
-Für die Tests werden Python 3, BusyBox und GNU cpio benötigt. Danach die neue
-`boot/custom.gz` und gegebenenfalls `grub.cfg` auf den Stick kopieren.
-Ein vorhandenes TinyCore-Backup (`tce/mydata.tgz`) kann Dateien aus dem
-Zusatz-Image wieder überschreiben; alte angepasste Startdateien müssen aus
-diesem Backup entfernt oder ebenfalls aktualisiert werden.
+Tests benötigen Python 3, BusyBox und GNU cpio. Sie schreiben nicht auf echte
+Blockgeräte. GitHub Actions führt dieselben Tests aus. `boot/custom.gz` und
+`install-manifest.json` gemeinsam mit ihren Quellen committen.
 
-## Optionale Pakete und Logs
+`SmcDumpKey` wurde vom funktionierenden Stick übernommen. Neubau auf einem passenden
+TinyCore-64-System: `gcc -O2 -Wall -o usr/local/bin/SmcDumpKey src/smc/SmcDumpKey.c`.
+Danach Zusatz-Image und Manifest neu bauen. Der ursprüngliche Autor ist Gabriel
+L. Somlo; die TDM-Fassung stammt aus [floe/smc_util](https://github.com/floe/smc_util).
+Lizenz des Programms: [GPLv2](src/smc/COPYING); mitgelieferte Systemkomponenten
+behalten ihre jeweiligen Lizenzen.
 
-`ddcutil`, Dropbear und die deutsche Keymap sind nicht im Basis-Image enthalten.
-Passende TinyCore-Erweiterungen müssen mit ihren Abhängigkeiten im persistenten
-TCE-Verzeichnis installiert und für den Bootvorgang aktiviert werden.
-Ohne deutsche Keymap bleibt das Standardlayout aktiv; das Startlog meldet dies.
-Vor Installation/Aktivierung von Dropbear die Zugangsdaten bzw. SSH-Authentifizierung
-konfigurieren; das TinyCore-Basissystem ist nicht für unveränderten Remotezugang gedacht.
+Ein vorhandenes **`tce/mydata.tgz` kann die neuen Startdateien überschreiben**.
+Der Installer erstellt deshalb ein frisches Dateisystem und importiert kein
+persönliches Backup. Passwortdateien, private SSH-Hostschlüssel und Shell-Historien
+gehören nicht ins öffentliche Repository.
 
-Logs: `/var/log/bootlocal.log`, `/var/log/ddc_diag_*.txt` und
-`/home/tc/ddc_diag_*.txt`. Bei persistentem TCE-Verzeichnis unter `/mnt/`
-wird zusätzlich dort `ddc_diag_last.txt` abgelegt, normalerweise unter
-`/mnt/sda1/tce/ddc_diag_last.txt`. Logs im RAM verschwinden beim Neustart.
-
-Die rekonstruierte Bootkette und die doppelten EFI-Dateien sind in
-[docs/boot-chain.md](docs/boot-chain.md) dokumentiert.
-
-## Herkunft und Wiederherstellung
-
-Die Programme unter `usr/local/bin/` stammen aus dem aktiven `tce/mydata.tgz`
-des funktionierenden Sticks. Kernel, Basis-Initramfs und beide EFI-Dateien sind
-bytegleich mit dem ursprünglichen Repository. Die alte Erweiterung `tdm.tcz`
-wird nicht benötigt: Ihre zusätzlich ausgeführten Energiesparbefehle und das
-pauschale `hdparm -Y /dev/sda` werden nicht übernommen.
-
-Das ausführbare `SmcDumpKey` ist die unveränderte x86-64-Datei vom Stick; zugehöriger
-Quellcode und GPLv2-Lizenz liegen unter `src/smc/`. Ursprünglicher Autor:
-Gabriel L. Somlo; TDM-Fassung aus [floe/smc_util](https://github.com/floe/smc_util).
-Neubau auf einem passenden TinyCore-System:
-
-```sh
-gcc -O2 -Wall -o usr/local/bin/SmcDumpKey src/smc/SmcDumpKey.c
-python3 scripts/build-overlay.py
-```
-
-Passwortdateien, private SSH-Hostschlüssel, Shell-Historien und persönliche Dateien
-vom Stick wurden nicht übernommen. SSH und deutsche Keymaps bleiben optionale
-Erweiterungen; für die direkte SMC-Umschaltung reichen die enthaltenen Programme.
-Der funktionierende Originalstick wurde bei der Wiederherstellung nur gelesen.
-Die integrierte Fassung wurde automatisiert und mit QEMU/OVMF geprüft, aber noch
-nicht auf dem iMac gebootet. Ergebnisse: [QEMU-Boottest](docs/qemu-test.md).
+Weitere Belege: [rekonstruierte Bootkette und alte Pfadkonflikte](docs/boot-chain.md),
+[QEMU-Tests und Grenzen](docs/qemu-test.md).

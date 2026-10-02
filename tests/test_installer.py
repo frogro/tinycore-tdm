@@ -40,10 +40,10 @@ class InstallerTests(unittest.TestCase):
              patch.object(installer.sys.stdin, 'isatty', return_value=True), \
              patch('builtins.input', return_value='nein') as prompt, \
              patch.object(installer, 'install') as install:
-            installer.main(['--device', '/dev/null', '--dry-run'])
+            installer.main(['--device', '/dev/null', '--dry-run', '--source', str(installer.ROOT)])
             prompt.assert_not_called()
             with self.assertRaises(ValueError):
-                installer.main(['--device', '/dev/null'])
+                installer.main(['--device', '/dev/null', '--source', str(installer.ROOT)])
             install.assert_not_called()
 
     def test_device_changed_before_write(self):
