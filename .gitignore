@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+
+# Private VM/reference data and downloaded payloads
+/qemu/
+/downloaded-payload/
+*.img
+*.qcow2

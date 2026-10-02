@@ -1,0 +1,17 @@
+name: Validate boot files and installer
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test tools
+        run: sudo apt-get update && sudo apt-get install -y busybox cpio
+      - name: Run tests without writing to block devices
+        run: python3 -m unittest discover -s tests -v
+      - name: Check whitespace
+        run: git diff --check

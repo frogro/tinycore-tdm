@@ -1,0 +1,4 @@
+#!/bin/sh
+VAL=$(/usr/local/bin/SmcDumpKey MVMR 2>/dev/null | sed -n 's/.*data="\\x\([0-9A-Fa-f][0-9A-Fa-f]\)".*/\1/p')
+echo "MVMR=0x${VAL:-??}"
+[ "$VAL" = "02" ] && exit 0 || exit 1
