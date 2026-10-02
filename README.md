@@ -5,11 +5,6 @@ seinen Mini-DisplayPort-Eingang als Bildschirm verwendet werden. Dieses Reposito
 enthält den USB-Installer, EFI-Bootloader, TinyCore und die vom funktionierenden
 Originalstick wiederhergestellten **64-Bit-SMC-Programme**.
 
-**Status:** Originalstick laut Besitzer funktionsfähig. Originalkopie und
-bereinigter Stand booten in QEMU/UEFI bis zur Konsole; auch der Konsolenmodus ist
-geprüft. Die bereinigte Fassung und die Status-/Toggle-Anpassung müssen noch am
-realen iMac getestet werden. QEMU kann die physische Displayumschaltung nicht testen.
-
 ## USB-Stick unter Linux installieren
 
 Benötigt werden ein Linux-Rechner, Internet, Python 3 und ein USB-Stick ab **512 MiB**.
@@ -126,61 +121,27 @@ Alle TDM-Programme liegen einheitlich unter **`/usr/local/bin`**. Die alten
 installiert. Die tatsächlichen Konsolenaufrufe des Originalstands wurden in QEMU
 mit Markern nachverfolgt; sie verwenden ebenfalls `/usr/local/bin`.
 
-## Diagnose, Tastaturlayout und SSH
+## Diagnose und optionale Fernwartung
 
-- Display-, Backlight-, I2C- und EDID-Diagnose ist enthalten. Sie schaltet den
-  Eingang nicht um; TDM verwendet die separate SMC-Steuerung.
-- **SSH, `ddcutil` und deutsche Keymaps sind nicht vorinstalliert.** Ohne Keymap
-  gilt das US-Tastaturlayout. Die TDM-Konsolentasten benötigen diese Pakete nicht.
-- Passende TinyCore-15.x-x86_64-Erweiterungen können mit Abhängigkeiten unter
-  `tce/optional/` und Einträgen in `tce/onboot.lst` ergänzt werden.
-- Ist Dropbear installiert, versucht der normale Start ihn zu starten. Zuerst
-  individuelle Zugangsdaten bzw. Schlüssel konfigurieren; keine Zugangsdaten des
-  alten Sticks übernehmen. Im Safe Console Mode wird er nicht durch bootlocal gestartet.
+**Für den reinen Monitorbetrieb sind keine Zusatzpakete, kein SSH und keine
+Schlüsseldateien erforderlich.** Das Umschalten erfolgt mit den oben beschriebenen
+Tasten am iMac. Nach der Installation wird dafür keine Internetverbindung benötigt.
 
-Logs liegen unter `/var/log/bootlocal.log`, `/var/log/ddc_diag_*.txt` und
-`/home/tc/ddc_diag_*.txt`. Bei persistentem TCE-Verzeichnis wird außerdem
-`tce/ddc_diag_last.txt` auf dem Stick gespeichert. RAM-Logs verschwinden beim Neustart.
+SSH wäre nur für Fernwartung nützlich: Von einem anderen Rechner ließen sich Logs
+ansehen oder TDM-Befehle ausführen, wenn die lokale Konsole gerade nicht sichtbar
+ist. SSH ist nicht vorinstalliert. Die dafür erwähnten Hostschlüssel identifizieren
+den SSH-Server und werden bei dessen Einrichtung automatisch erzeugt. Sie sind
+keine Voraussetzung für TDM.
 
-## Aufbau und Entwicklung
+Die enthaltene Diagnose sammelt Informationen zu Display und Helligkeitssteuerung.
+`ddcutil` wäre ein zusätzliches Diagnose-/Steuerwerkzeug für DDC/CI; es wird für die
+TDM-Umschaltung nicht benötigt. Weitere TinyCore-Erweiterungen müssen für den
+Monitorbetrieb nicht installiert werden.
 
-```text
-EFI/BOOT/BOOTX64.EFI       Einziger ausgelieferter EFI-Bootloader
-boot/vmlinuz              TinyCore-64-Kernel
-boot/corepure64.gz         Basis-Initramfs
-boot/custom.gz            Reproduzierbares Zusatz-Initramfs mit TDM und Startdateien
-grub.cfg                  Zentrale Bootkonfiguration
-etc/ und opt/             Quellen für Startkonfiguration und Diagnose
-usr/local/bin/            TDM-Skripte und 64-Bit-SmcDumpKey
-src/smc/                  Zugehöriger C-Quellcode und GPLv2-Lizenz
-scripts/install-usb.py     Eigenständig verwendbarer GitHub-/USB-Installer
-install-manifest.json     Dateiliste, Größen und SHA-256 für die Installation
-```
+Die Textkonsole verwendet standardmäßig das US-Tastaturlayout. Ein deutsches Layout
+wäre nur für die Eingabe von Textbefehlen hilfreich; die TDM-Funktionstasten
+funktionieren auch ohne dieses Zusatzpaket.
 
-Die losen `etc/`- und `opt/`-Dateien werden nicht direkt vom Stick geladen. GRUB
-lädt das Basis- und anschließend das Zusatz-Initramfs. Nach Änderungen:
-
-```sh
-python3 scripts/build-overlay.py
-python3 scripts/build-manifest.py
-python3 -m unittest discover -s tests -v
-```
-
-Tests benötigen Python 3, BusyBox und GNU cpio. Sie schreiben nicht auf echte
-Blockgeräte. GitHub Actions führt dieselben Tests aus. `boot/custom.gz` und
-`install-manifest.json` gemeinsam mit ihren Quellen committen.
-
-`SmcDumpKey` wurde vom funktionierenden Stick übernommen. Neubau auf einem passenden
-TinyCore-64-System: `gcc -O2 -Wall -o usr/local/bin/SmcDumpKey src/smc/SmcDumpKey.c`.
-Danach Zusatz-Image und Manifest neu bauen. Der ursprüngliche Autor ist Gabriel
-L. Somlo; die TDM-Fassung stammt aus [floe/smc_util](https://github.com/floe/smc_util).
-Lizenz des Programms: [GPLv2](src/smc/COPYING); mitgelieferte Systemkomponenten
-behalten ihre jeweiligen Lizenzen.
-
-Ein vorhandenes **`tce/mydata.tgz` kann die neuen Startdateien überschreiben**.
-Der Installer erstellt deshalb ein frisches Dateisystem und importiert kein
-persönliches Backup. Passwortdateien, private SSH-Hostschlüssel und Shell-Historien
-gehören nicht ins öffentliche Repository.
-
-Weitere Belege: [rekonstruierte Bootkette und alte Pfadkonflikte](docs/boot-chain.md),
-[QEMU-Tests und Grenzen](docs/qemu-test.md).
+Bei Problemen liegt das Startprotokoll unter `/var/log/bootlocal.log`. Die letzte
+Displaydiagnose wird bei vorhandenem persistentem TCE-Verzeichnis zusätzlich als
+`tce/ddc_diag_last.txt` auf dem Stick gespeichert.
