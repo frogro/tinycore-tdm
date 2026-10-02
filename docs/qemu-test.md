@@ -30,11 +30,30 @@ bleiben im ignorierten lokalen qemu-Verzeichnis und werden nicht veröffentlicht
 - Die Diagnose suchte noch unter /usr/bin und meldete die tatsächlich unter
   /usr/local/bin vorhandenen TDM-Programme als fehlend. Dieser Pfad wurde nach
   dem Boottest korrigiert und das Zusatz-Initramfs neu gebaut; Shell- und
-  Archivtests bestehen. Diese kleine Korrektur wurde nicht erneut voll gebootet.
+  Archivtests bestehen. Die Korrektur wurde anschließend im direkt von GitHub heruntergeladenen Payload erneut gebootet.
 
 - Ein zweiter Boot des bereinigten Images über den Safe Console Mode erreicht
   die Konsole mit `text tdm_safe=1`. `/var/log/bootlocal.log` existiert danach
   nicht; die projektspezifischen Startaufgaben wurden übersprungen.
+
+## Test des GitHub-Download-Installers
+
+Der Installer wurde separat von GitHub heruntergeladen und außerhalb seines
+ursprünglichen scripts-Verzeichnisses ausgeführt. Mit `--download-only` lud und
+prüfte er die fünf Dateien von Commit 0b614e9. Daraus wurde ein neues lokales
+512-MiB-Testimage gebaut, ohne die alternative EFI-Datei.
+
+Dieses Image bootete bis zur Konsole. Das Startlog meldet die drei TDM-Programme
+nun korrekt unter `/usr/local/bin` als vorhanden. Beim ersten VM-Kaltstart meldete
+OVMF einmal `Not Found`; nach einem Reset startete es. Ein anschließender Neustart
+mit einer frischen OVMF-VARIABLES-Datei startete ebenfalls erfolgreich. Die Ursache
+des einzelnen Fehlstarts wurde nicht festgestellt; die zweite EFI-Datei wurde
+für keinen dieser Versuche wieder hinzugefügt.
+
+GitHub Actions und die lokale Testsuite bestehen mit 13 Tests. Download-Prüfsummen,
+unerlaubte Manifestpfade, beschädigte Dateien, Gerätewahl, Bestätigungsabbruch und
+simulierter Installationsablauf sind abgedeckt. Ein physischer USB-Schreibtest und
+der Hardwaretest am iMac bleiben offen.
 
 ## Ausgeführte TDM-Pfade im Originalsystem
 
