@@ -5,6 +5,63 @@ Der aktuelle Stand bootet TinyCore und sammelt Display-Diagnosen.
 **Das Umschalten in den Target Display Mode ist noch nicht implementiert.**
 DDC/CI-Helligkeitssteuerung und TDM-Umschaltung sind unterschiedliche Funktionen.
 
+## USB-Stick unter Linux erstellen
+
+Der Installer erstellt direkt einen bootfähigen USB-Stick aus den Dateien im
+Repository; eine separate `.img`-Datei ist nicht erforderlich. **Alle Daten auf
+dem gewählten USB-Laufwerk werden gelöscht.** Andere USB-Laufwerke möglichst
+vorher abziehen. Ein Stick ab 512 MiB genügt für den enthaltenen Stand.
+
+Unter Debian/Ubuntu die benötigten Werkzeuge installieren:
+
+```sh
+sudo apt install python3 util-linux parted dosfstools udev
+```
+
+Im Repository-Verzeichnis:
+
+```sh
+# Geräte mit Modell, Größe, Seriennummer und belegten Partitionen anzeigen:
+python3 scripts/install-usb.py --list
+
+# /dev/sdX durch das tatsächlich gewünschte ganze USB-Laufwerk ersetzen.
+# Eingehängte Partitionen vorher über den Dateimanager aushängen.
+python3 scripts/install-usb.py --device /dev/sdX --dry-run
+sudo python3 scripts/install-usb.py --device /dev/sdX
+```
+
+Der Probelauf schreibt nichts. Die Installation verlangt zusätzlich die genaue
+Eingabe `LOESCHEN /dev/sdX`. Sie verweigert interne Laufwerke, einzelne Partitionen,
+eingehängte Geräte, aktiven Swap und verwendete Mapper-/RAID-Geräte. Sie hängt
+vorhandene Dateisysteme nicht automatisch aus. Der Installer legt eine
+GPT-Partitionstabelle mit einer FAT32-EFI-Systempartition und Label `TINYCORE` an,
+kopiert die Bootdateien, vergleicht SHA-256-Prüfsummen und hängt den Stick aus.
+Bei einem Fehler nach Beginn der Partitionierung kann der Stick unvollständig
+sein; nach Behebung der Ursache die Installation erneut starten.
+
+Am iMac beim Einschalten **Alt/Option** gedrückt halten und den USB-EFI-Boot wählen.
+Falls das mitgelieferte GRUB zunächst sein Suchmenü zeigt, den Eintrag zum Finden
+von `grub.cfg` auswählen. Der Installer wurde mit simulierten Geräten getestet;
+ein realer Schreib- und Bootversuch am iMac steht noch aus.
+
+## Funktionsumfang
+
+| Funktion | Stand |
+| --- | --- |
+| Linux-USB-Installer mit Probelauf und Geräteprüfung | Implementiert, automatisiert getestet |
+| TinyCore-Boot mit Diagnose- und Konsolenmodus | Konfiguriert, iMac-Bootprüfung offen |
+| Backlight-, I2C-, DRM- und EDID-Diagnose | Implementiert; Ergebnisse hardwareabhängig |
+| DDC/CI-Erkennung und Helligkeitsabfrage | Optional mit installiertem `ddcutil` |
+| SSH | Optional mit installiertem und konfiguriertem Dropbear |
+| Wechsel in TDM und zurück | Noch nicht implementiert |
+| Tastenkürzel oder automatischer TDM-Start | Noch nicht implementiert |
+
+Es gibt aktuell **keinen funktionierenden TDM-Umschaltbefehl** in diesem Image.
+Insbesondere sind virtuelle Konsolen und die DDC-Diagnose keine Umschalter.
+Die geplante SMC-Integration muss sowohl das Einschalten des externen Eingangs
+als auch die Rückkehr zur internen Anzeige unterstützen. Ein Rückschaltweg per
+Tastatur oder SSH muss am Zielgerät geprüft sein, bevor Autostart sinnvoll ist.
+
 ## Booten
 
 Die Partition muss das Dateisystemlabel `TINYCORE` tragen. Auf einem bereits
