@@ -1,0 +1,5 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.cfg text eol=lf
+etc/inittab text eol=lf
+*.gz binary

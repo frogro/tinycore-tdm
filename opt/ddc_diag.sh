@@ -13,6 +13,14 @@ out="/home/tc/ddc_diag_${ts}.txt"
 log() { printf "%s\n" "$*" | tee -a "$out" ; }
 hdr() { printf "\n==== %s ====\n" "$*" | tee -a "$out"; }
 
+# Ein existierendes, aber leeres Klassenverzeichnis ist kein Backlight.
+has_backlight() {
+  for backlight in /sys/class/backlight/*; do
+    [ -r "$backlight/brightness" ] && [ -r "$backlight/max_brightness" ] && return 0
+  done
+  return 1
+}
+
 # Start
 echo "# ddc_diag – $(date)" > "$out"
 
@@ -30,7 +38,7 @@ else
 fi
 
 hdr "/sys/class/backlight"
-if ls /sys/class/backlight 1>/dev/null 2>&1; then
+if has_backlight; then
   ls -l /sys/class/backlight | tee -a "$out"
   for b in /sys/class/backlight/*; do
     [ -d "$b" ] || continue
@@ -87,7 +95,7 @@ for c in /usr/bin/tdm_on /usr/bin/tdm_off /usr/bin/tdm_toggle; do
 done
 
 hdr "Fazit (Kurz)"
-if ls /sys/class/backlight 1>/dev/null 2>&1; then
+if has_backlight; then
   log "Backlight-Interface gefunden → brightnessctl/sysfs-Steuerung möglich."
 else
   log "Kein Backlight-Interface. Wenn i2c/devices & EDID vorhanden: DDC/CI möglich (ddcutil nötig)."

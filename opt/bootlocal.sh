@@ -1,6 +1,11 @@
 #!/bin/sh
 # TinyCore bootlocal.sh (DE-Layout + DHCP + SSH + DDC-Diag)
 
+# Safe Console Mode überspringt alle projektspezifischen Dienste.
+if grep -qw 'tdm_safe=1' /proc/cmdline; then
+  exit 0
+fi
+
 # --- Logging vorbereiten ---
 LOGDIR=/var/log
 mkdir -p "$LOGDIR"
@@ -33,8 +38,11 @@ if [ -x /usr/local/sbin/dropbear ]; then
   [ -s /usr/local/etc/dropbear/dropbear_rsa_host_key ]     || /usr/local/bin/dropbearkey -t rsa     -f /usr/local/etc/dropbear/dropbear_rsa_host_key
   [ -s /usr/local/etc/dropbear/dropbear_ecdsa_host_key ]   || /usr/local/bin/dropbearkey -t ecdsa   -f /usr/local/etc/dropbear/dropbear_ecdsa_host_key
   [ -s /usr/local/etc/dropbear/dropbear_ed25519_host_key ] || /usr/local/bin/dropbearkey -t ed25519 -f /usr/local/etc/dropbear/dropbear_ed25519_host_key
-  /usr/local/sbin/dropbear -R -E -p 22 >> "$BOOTLOG" 2>&1
-  echo "[ssh] dropbear läuft (Port 22)" >> "$BOOTLOG"
+  if /usr/local/sbin/dropbear -R -E -p 22 >> "$BOOTLOG" 2>&1; then
+    echo "[ssh] dropbear gestartet (Port 22)" >> "$BOOTLOG"
+  else
+    echo "[ssh] dropbear konnte nicht gestartet werden" >> "$BOOTLOG"
+  fi
 else
   echo "[ssh] dropbear nicht installiert" >> "$BOOTLOG"
 fi
@@ -52,18 +60,17 @@ else
   echo "[ddc] kein ddc_diag.sh gefunden" >> "$BOOTLOG"
 fi
 
-# 5) DDC-Log zusätzlich auf den USB-Stick kopieren (erstes gemountetes /mnt/sdX1)
-for p in /mnt/sd?1 /mnt/sd??1; do
-  # Fallback, falls BusyBox kein 'mountpoint' hat
-  if command -v mountpoint >/dev/null 2>&1; then
-    mountpoint -q "$p" || continue
-  else
-    grep -q " $p " /proc/mounts || continue
-  fi
-  cp -f "$DDCLOG" "$p/ddc_diag_last.txt" 2>>"$BOOTLOG" && \
-    echo "[ddc] Log nach $p/ddc_diag_last.txt kopiert" >> "$BOOTLOG"
-  break
-done
+# 5) Nur das konfigurierte persistente TCE-Verzeichnis verwenden.
+# /tmp/tce ist flüchtig; kein beliebiges anderes Laufwerk beschreiben.
+TCEDIR=$(readlink -f /etc/sysconfig/tcedir)
+case "$TCEDIR" in
+  /mnt/*)
+    if [ -f "$DDCLOG" ] && [ -d "$TCEDIR" ]; then
+      cp -f "$DDCLOG" "$TCEDIR/ddc_diag_last.txt" 2>>"$BOOTLOG" &&
+        echo "[ddc] Log nach $TCEDIR/ddc_diag_last.txt kopiert" >> "$BOOTLOG"
+    fi
+    ;;
+esac
 
 echo "== bootlocal end: $(date) ==" >> "$BOOTLOG"
 exit 0
