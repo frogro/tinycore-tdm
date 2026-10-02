@@ -72,5 +72,11 @@ case "$TCEDIR" in
     ;;
 esac
 
+# TDM nur im ausdrücklich ausgewählten Autostart-Menü einschalten.
+if grep -qw 'tdm_autostart=1' /proc/cmdline; then
+  sleep 10
+  /usr/local/bin/tdm_on >> "$BOOTLOG" 2>&1
+fi
+
 echo "== bootlocal end: $(date) ==" >> "$BOOTLOG"
 exit 0

@@ -1,8 +1,9 @@
 # TinyCore Display-Diagnose / TDM-Vorbereitung
 
 Zielgerät: **iMac 27 Zoll, Ende 2009**, Target Display Mode (TDM).
-Der aktuelle Stand bootet TinyCore und sammelt Display-Diagnosen.
-**Das Umschalten in den Target Display Mode ist noch nicht implementiert.**
+Die TDM-Programme wurden vom funktionierenden USB-Stick des Besitzers wiederhergestellt.
+Sie waren im ursprünglichen GitHub-Upload nicht enthalten, sondern in `tce/mydata.tgz`.
+Der neue, bereinigte Repository-Build muss noch auf dem iMac getestet werden.
 DDC/CI-Helligkeitssteuerung und TDM-Umschaltung sind unterschiedliche Funktionen.
 
 ## USB-Stick unter Linux erstellen
@@ -53,14 +54,38 @@ ein realer Schreib- und Bootversuch am iMac steht noch aus.
 | Backlight-, I2C-, DRM- und EDID-Diagnose | Implementiert; Ergebnisse hardwareabhängig |
 | DDC/CI-Erkennung und Helligkeitsabfrage | Optional mit installiertem `ddcutil` |
 | SSH | Optional mit installiertem und konfiguriertem Dropbear |
-| Wechsel in TDM und zurück | Noch nicht implementiert |
-| Tastenkürzel oder automatischer TDM-Start | Noch nicht implementiert |
+| Wechsel in TDM und zurück | Programme vom funktionierenden Stick übernommen |
+| Tastenkürzel oder automatischer TDM-Start | Wiederhergestellt; siehe Bedienung |
 
-Es gibt aktuell **keinen funktionierenden TDM-Umschaltbefehl** in diesem Image.
-Insbesondere sind virtuelle Konsolen und die DDC-Diagnose keine Umschalter.
-Die geplante SMC-Integration muss sowohl das Einschalten des externen Eingangs
-als auch die Rückkehr zur internen Anzeige unterstützen. Ein Rückschaltweg per
-Tastatur oder SSH muss am Zielgerät geprüft sein, bevor Autostart sinnvoll ist.
+## TDM bedienen
+
+Die Tastatur muss am **iMac** angeschlossen sein. In der Linux-Textkonsole:
+
+| Aktion | Tastatur | Konsole/SSH |
+| --- | --- | --- |
+| TDM einschalten | Alt+F3, danach Enter | `sudo /usr/local/bin/tdm_on` |
+| Zur internen Anzeige zurück | Alt+F4, danach Enter | `sudo /usr/local/bin/tdm_off` |
+| Umschalten | Alt+F2, danach Enter | `sudo /usr/local/bin/tdm_toggle` |
+| Status abfragen | — | `sudo /usr/local/bin/tdm_status` |
+| Herunterfahren | Alt+F5, danach Enter | `sudo /usr/local/bin/tdm_shutdown` |
+
+Je nach Tastatur zusätzlich Fn drücken. Unter einer grafischen Sitzung kann
+Strg+Alt+Fn erforderlich sein. `askfirst` verlangt Enter vor dem Befehl; die
+Befehle werden nicht automatisch durch Init ausgeführt.
+
+Das erste GRUB-Menü aktiviert TDM nach den Startaufgaben und zehn Sekunden Wartezeit.
+**Safe Console Mode** aktiviert TDM nicht automatisch; manuelles Umschalten bleibt möglich.
+Die virtuelle Konsole kann auch bei externem Bildsignal blind ausgewählt werden.
+
+`SmcDumpKey` steuert den Apple-SMC: Einschalten schreibt `MVHR=1`, danach `MVMR=2`;
+Ausschalten schreibt `MVHR=0`, danach `MVMR=2`. Beim Ausschalten wird `applesmc`
+wieder geladen und, falls verfügbar, auf Konsole 1 gewechselt. Vor jedem erneuten
+Einschalten wird der Treiber entladen. `xrandr` ist optional.
+
+Die vom Stick übernommene Statusinterpretation behandelt `MVMR=0x02` als aktiv.
+Die Statusabfrage wurde auf reines Lesen korrigiert: Der alte Aufruf schrieb bei
+jeder Abfrage zusätzlich `MVMR=2`. Status und Toggle müssen deshalb am Gerät geprüft
+werden; die expliziten Ein-/Aus-Befehle stehen unabhängig davon zur Verfügung.
 
 ## Booten
 
@@ -73,11 +98,10 @@ Das zweite Initramfs enthält die korrigierte `etc/inittab` sowie die beiden
 Skripte aus `opt/`, jeweils mit den benötigten Linux-Dateirechten. Die losen
 Dateien auf dem Stick allein würden TinyCores RAM-Dateisystem nicht verändern.
 
-- **Display-Diagnose** startet Netzwerk-/Display-Diagnose und, falls installiert, SSH.
+- **TDM Auto-Start** startet Diagnose, optional SSH und danach TDM.
 - **Safe Console Mode** überspringt `bootlocal.sh`; TinyCores normale
   Initialisierung und DHCP bleiben aktiv.
-- Herunterfahren erfolgt ausdrücklich mit `sudo poweroff` in der Konsole.
-  Die virtuellen Konsolen sind keine TDM-Tastenkürzel.
+- Die virtuellen Konsolen verwenden die oben beschriebenen TDM-Befehle mit Enter-Bestätigung.
 
 Änderungen an `opt/` oder `etc/inittab` erfordern einen Neubau:
 
@@ -106,16 +130,30 @@ Logs: `/var/log/bootlocal.log`, `/var/log/ddc_diag_*.txt` und
 wird zusätzlich dort `ddc_diag_last.txt` abgelegt, normalerweise unter
 `/mnt/sda1/tce/ddc_diag_last.txt`. Logs im RAM verschwinden beim Neustart.
 
-## Noch offen: TDM auf dem Zielgerät
+Die rekonstruierte Bootkette und die doppelten EFI-Dateien sind in
+[docs/boot-chain.md](docs/boot-chain.md) dokumentiert.
 
-`tdm_on`, `tdm_off` und `tdm_toggle` fehlen weiterhin. Deshalb gibt es keinen
-wirkungslosen `tdm_autostart`-Bootparameter mehr. Als Ausgangspunkt für die
-SMC-Ansteuerung existiert [floe/smc_util](https://github.com/floe/smc_util),
-dessen Autor Tests auf einem **27-Zoll-iMac von Mitte 2010** dokumentiert.
-Das ist noch kein Nachweis für diesen iMac von 2009 oder dieses TinyCore-Image.
-Vor einer Integration müssen die SMC-Steuerung und die Rückkehr zum internen
-Display auf dem Zielgerät geprüft werden. Die Diagnose allein aktiviert TDM nicht.
+## Herkunft und Wiederherstellung
 
-Die automatischen Prüfungen decken Shellsyntax, Backlight-Erkennung sowie
-Inhalt, Rechte und reproduzierbaren Bau des Zusatz-Images ab.
-Ein UEFI-Boot und die Hardwarefunktionen wurden nicht auf einem iMac getestet.
+Die Programme unter `usr/local/bin/` stammen aus dem aktiven `tce/mydata.tgz`
+des funktionierenden Sticks. Kernel, Basis-Initramfs und beide EFI-Dateien sind
+bytegleich mit dem ursprünglichen Repository. Die alte Erweiterung `tdm.tcz`
+wird nicht benötigt: Ihre zusätzlich ausgeführten Energiesparbefehle und das
+pauschale `hdparm -Y /dev/sda` werden nicht übernommen.
+
+Das ausführbare `SmcDumpKey` ist die unveränderte x86-64-Datei vom Stick; zugehöriger
+Quellcode und GPLv2-Lizenz liegen unter `src/smc/`. Ursprünglicher Autor:
+Gabriel L. Somlo; TDM-Fassung aus [floe/smc_util](https://github.com/floe/smc_util).
+Neubau auf einem passenden TinyCore-System:
+
+```sh
+gcc -O2 -Wall -o usr/local/bin/SmcDumpKey src/smc/SmcDumpKey.c
+python3 scripts/build-overlay.py
+```
+
+Passwortdateien, private SSH-Hostschlüssel, Shell-Historien und persönliche Dateien
+vom Stick wurden nicht übernommen. SSH und deutsche Keymaps bleiben optionale
+Erweiterungen; für die direkte SMC-Umschaltung reichen die enthaltenen Programme.
+Der funktionierende Originalstick wurde bei der Wiederherstellung nur gelesen.
+Die integrierte neue Fassung ist automatisiert geprüft, aber noch nicht auf dem
+iMac gebootet worden.

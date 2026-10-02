@@ -5,10 +5,10 @@
 
 # /sbin/getty respawn shell invocations for selected ttys.
 tty1::respawn:/sbin/getty -nl /sbin/autologin 38400 tty1
-#tty2::respawn:/sbin/getty 38400 tty2
-#tty3::respawn:/sbin/getty 38400 tty3
-#tty4::askfirst:/sbin/getty 38400 tty4
-#tty5::askfirst:/sbin/getty 38400 tty5
+tty2::askfirst:/usr/local/bin/tdm_toggle
+tty3::askfirst:/usr/local/bin/tdm_on
+tty4::askfirst:/usr/local/bin/tdm_off
+tty5::askfirst:/usr/local/bin/tdm_shutdown
 #tty6::askfirst:/sbin/getty 38400 tty6
 
 # Stuff to do when restarting the init

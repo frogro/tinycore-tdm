@@ -1,0 +1,9 @@
+#!/bin/sh
+command -v xrandr >/dev/null 2>&1 || xrandr() { :; }
+# tdm_off lädt applesmc zurück; vor jedem erneuten Einschalten freigeben.
+modprobe -r applesmc 2>/dev/null || rmmod applesmc 2>/dev/null || true
+/usr/local/bin/SmcDumpKey MVHR 1
+sleep 1
+/usr/local/bin/SmcDumpKey MVMR 2
+sleep 2
+DISPLAY=:0.0 xrandr --output eDP --off

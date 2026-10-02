@@ -1,0 +1,18 @@
+#!/bin/sh
+# robustes TDM OFF
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# xrandr ist optional – stub, falls nicht vorhanden
+command -v xrandr >/dev/null 2>&1 || xrandr() { :; }
+
+# 1) Display zurückgeben
+/usr/local/bin/SmcDumpKey MVHR 0
+sleep 0.2
+/usr/local/bin/SmcDumpKey MVMR 2
+sleep 0.5
+
+# 2) SMC-Treiber zurückladen, damit Helligkeit/FB wieder sauber sind
+modprobe applesmc 2>/dev/null || true
+
+# 3) Zur Textkonsole wechseln (falls util-linux installiert)
+command -v chvt >/dev/null 2>&1 && chvt 1 || true

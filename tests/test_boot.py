@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class BootTests(unittest.TestCase):
     def test_shell_syntax(self):
-        for script in (ROOT / 'opt').glob('*.sh'):
+        for script in list((ROOT / 'opt').glob('*.sh')) + list((ROOT / 'usr/local/bin').glob('tdm_*')):
             with self.subTest(script=script.name):
                 self.assertNotIn(b'\r', script.read_bytes())
                 subprocess.run(['busybox', 'sh', '-n', str(script)], check=True)
@@ -28,6 +28,10 @@ class BootTests(unittest.TestCase):
                 extracted = Path(directory) / name
                 self.assertEqual(extracted.read_bytes(), (ROOT / name).read_bytes())
                 self.assertEqual(extracted.stat().st_mode & 0o777, mode)
+            for source in (ROOT / 'usr/local/bin').iterdir():
+                extracted = Path(directory) / source.relative_to(ROOT)
+                self.assertEqual(extracted.read_bytes(), source.read_bytes())
+                self.assertEqual(extracted.stat().st_mode & 0o777, 0o755)
         config = (ROOT / 'grub.cfg').read_text()
         self.assertEqual(config.count('initrd /boot/corepure64.gz /boot/custom.gz'), 2)
         init = (ROOT / 'etc/inittab').read_text()

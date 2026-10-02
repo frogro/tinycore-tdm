@@ -19,13 +19,18 @@ def archive_entry(name, data, mode, inode):
 
 def build():
     entries = [('etc', b'', stat.S_IFDIR | 0o755),
-               ('opt', b'', stat.S_IFDIR | 0o755)]
+               ('opt', b'', stat.S_IFDIR | 0o755),
+               ('usr', b'', stat.S_IFDIR | 0o755),
+               ('usr/local', b'', stat.S_IFDIR | 0o755),
+               ('usr/local/bin', b'', stat.S_IFDIR | 0o755)]
     for name, mode in [('etc/inittab', 0o644), ('opt/bootlocal.sh', 0o755),
                        ('opt/ddc_diag.sh', 0o755)]:
         data = (ROOT / name).read_bytes()
         if b'\r' in data:
             raise ValueError(f'{name}: expected Unix LF line endings')
         entries.append((name, data, stat.S_IFREG | mode))
+    for path in sorted((ROOT / 'usr/local/bin').iterdir()):
+        entries.append((str(path.relative_to(ROOT)), path.read_bytes(), stat.S_IFREG | 0o755))
     entries.append(('TRAILER!!!', b'', 0))
     payload = b''.join(archive_entry(name, data, mode, i)
                        for i, (name, data, mode) in enumerate(entries, 1))
