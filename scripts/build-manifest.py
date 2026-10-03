@@ -9,5 +9,9 @@ entries = []
 for name in names:
     data = (root / name).read_bytes()
     entries.append(dict(path=name, size=len(data), sha256=hashlib.sha256(data).hexdigest()))
-(root / 'install-manifest.json').write_text(json.dumps(dict(version=1, files=entries), indent=2) + '\n')
+optional = []
+for name in ['tce/optional/kmaps.tcz', 'tce/optional/dropbear.tcz']:
+    data = (root / name).read_bytes()
+    optional.append(dict(path=name, size=len(data), sha256=hashlib.sha256(data).hexdigest()))
+(root / 'install-manifest.json').write_text(json.dumps(dict(version=1, files=entries, optional_files=optional), indent=2) + '\n')
 print('install-manifest.json')

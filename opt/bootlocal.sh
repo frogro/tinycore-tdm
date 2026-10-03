@@ -1,5 +1,5 @@
 #!/bin/sh
-# TinyCore bootlocal.sh (DE-Layout + DHCP + SSH + DDC-Diag)
+# TinyCore bootlocal.sh (DHCP + optionales SSH + DDC-Diag)
 
 # Safe Console Mode überspringt alle projektspezifischen Dienste.
 if grep -qw 'tdm_safe=1' /proc/cmdline; then
@@ -15,14 +15,6 @@ echo "== bootlocal start: $(date) ==" >> "$BOOTLOG"
 # 0) Netz-Interface (falls nicht eth0, z.B. enp2s0)
 IFACE="eth0"
 
-# 1) Deutsches Tastaturlayout (Konsole)
-if [ -f /usr/share/kmap/qwertz/de-latin1.kmap ]; then
-  busybox loadkmap < /usr/share/kmap/qwertz/de-latin1.kmap
-  echo "[kbd] de-latin1 geladen" >> "$BOOTLOG"
-else
-  echo "[kbd] /usr/share/kmap/qwertz/de-latin1.kmap fehlt" >> "$BOOTLOG"
-fi
-
 # 2) DHCP nur starten, wenn noch keine IPv4 vorhanden ist
 if ip addr show "$IFACE" 2>/dev/null | grep -q 'inet '; then
   echo "[net] $IFACE hat bereits IPv4" >> "$BOOTLOG"
@@ -32,20 +24,8 @@ else
     >> "$LOGDIR/udhcpc.log" 2>&1
 fi
 
-# 3) SSH (Dropbear) starten – Hostkeys ggf. erzeugen
-if [ -x /usr/local/sbin/dropbear ]; then
-  mkdir -p /usr/local/etc/dropbear
-  [ -s /usr/local/etc/dropbear/dropbear_rsa_host_key ]     || /usr/local/bin/dropbearkey -t rsa     -f /usr/local/etc/dropbear/dropbear_rsa_host_key
-  [ -s /usr/local/etc/dropbear/dropbear_ecdsa_host_key ]   || /usr/local/bin/dropbearkey -t ecdsa   -f /usr/local/etc/dropbear/dropbear_ecdsa_host_key
-  [ -s /usr/local/etc/dropbear/dropbear_ed25519_host_key ] || /usr/local/bin/dropbearkey -t ed25519 -f /usr/local/etc/dropbear/dropbear_ed25519_host_key
-  if /usr/local/sbin/dropbear -R -E -p 22 >> "$BOOTLOG" 2>&1; then
-    echo "[ssh] dropbear gestartet (Port 22)" >> "$BOOTLOG"
-  else
-    echo "[ssh] dropbear konnte nicht gestartet werden" >> "$BOOTLOG"
-  fi
-else
-  echo "[ssh] dropbear nicht installiert" >> "$BOOTLOG"
-fi
+# SSH nur mit expliziter Installer-Konfiguration starten.
+/opt/ssh-start.sh >> "$BOOTLOG" 2>&1
 
 # 4) DDC-Diagnose (falls Skript vorhanden) + Log ablegen
 DDCLOG="$LOGDIR/ddc_diag_$(date +%Y%m%d_%H%M%S).txt"

@@ -109,39 +109,75 @@ Die Tastatur muss am iMac angeschlossen sein. In der Linux-Textkonsole:
 | Herunterfahren | Alt+F5, danach Enter | `sudo /usr/local/bin/tdm_shutdown` |
 | Normale Konsole auswählen | Alt+F1 | — |
 
-Je nach Tastatur zusätzlich **Fn** drücken. Enter ist erforderlich, weil die
-Konsolen `askfirst` verwenden. Beim externen Bildsignal können die Konsolentasten
-blind bedient werden. Für den ersten Hardwaretest die expliziten ON-/OFF-Befehle
-verwenden: Die vom Stick übernommene Statusinterpretation (`MVMR=0x02` als aktiv)
-ist noch nicht am Gerät bestätigt. Die Statusabfrage wurde auf reines Lesen
-korrigiert; der alte Aufruf schrieb bei jeder Abfrage zusätzlich `MVMR=2`.
+## Tastaturlayout und SSH im Installer auswählen
 
-Alle TDM-Programme liegen einheitlich unter **`/usr/local/bin`**. Die alten
-`/usr/bin`-Varianten aus `tdm.tcz` und die alte 32-Bit-SMC-Binärdatei werden nicht
-installiert. Die tatsächlichen Konsolenaufrufe des Originalstands wurden in QEMU
-mit Markern nachverfolgt; sie verwenden ebenfalls `/usr/local/bin`.
+Ohne weitere Optionen verwendet die Konsole das US-Layout und SSH bleibt aus.
+Für eine deutsche Tastatur ergänze `--keymap de`:
 
-## Diagnose und optionale Fernwartung
+```sh
+sudo python3 install-usb.py --device /dev/sdX --keymap de
+```
 
-**Für den reinen Monitorbetrieb sind keine Zusatzpakete, kein SSH und keine
-Schlüsseldateien erforderlich.** Das Umschalten erfolgt mit den oben beschriebenen
-Tasten am iMac. Nach der Installation wird dafür keine Internetverbindung benötigt.
+Der Installer lädt das passende Tastaturpaket automatisch mit herunter. Für den
+reinen Monitorbetrieb genügt diese Installation; SSH ist freiwillig.
 
-SSH wäre nur für Fernwartung nützlich: Von einem anderen Rechner ließen sich Logs
-ansehen oder TDM-Befehle ausführen, wenn die lokale Konsole gerade nicht sichtbar
-ist. SSH ist nicht vorinstalliert. Die dafür erwähnten Hostschlüssel identifizieren
-den SSH-Server und werden bei dessen Einrichtung automatisch erzeugt. Sie sind
-keine Voraussetzung für TDM.
+### Wozu SSH?
 
-Die enthaltene Diagnose sammelt Informationen zu Display und Helligkeitssteuerung.
-`ddcutil` wäre ein zusätzliches Diagnose-/Steuerwerkzeug für DDC/CI; es wird für die
-TDM-Umschaltung nicht benötigt. Weitere TinyCore-Erweiterungen müssen für den
-Monitorbetrieb nicht installiert werden.
+Mit SSH kannst du den iMac über das lokale Netzwerk von einem anderen Rechner
+bedienen, auch während er ein externes Bild zeigt. Zum Beispiel kannst du so
+zur internen Anzeige zurückschalten oder den iMac herunterfahren. Verbinde den
+iMac dafür per Netzwerkkabel mit deinem Router.
 
-Die Textkonsole verwendet standardmäßig das US-Tastaturlayout. Ein deutsches Layout
-wäre nur für die Eingabe von Textbefehlen hilfreich; die TDM-Funktionstasten
-funktionieren auch ohne dieses Zusatzpaket.
+### Zugang mit Passwort
 
-Bei Problemen liegt das Startprotokoll unter `/var/log/bootlocal.log`. Die letzte
-Displaydiagnose wird bei vorhandenem persistentem TCE-Verzeichnis zusätzlich als
-`tce/ddc_diag_last.txt` auf dem Stick gespeichert.
+```sh
+sudo python3 install-usb.py --device /dev/sdX --keymap de --ssh-password
+```
+
+Der Installer fragt zweimal verdeckt nach einem neuen Passwort für den Benutzer
+`tc`. Auf dem Stick liegt nur dessen gesalzener Prüfwert, nicht das Klartextpasswort.
+Auf dem Linux-Rechner wird dafür zusätzlich das Paket `openssl` benötigt.
+
+### Zugang mit SSH-Schlüssel
+
+Wenn du bereits einen SSH-Schlüssel besitzt, übergib dessen **öffentliche `.pub`-Datei**:
+
+```sh
+sudo python3 install-usb.py --device /dev/sdX --keymap de --ssh-key ~/.ssh/id_ed25519.pub
+```
+
+Falls du noch keinen hast, kannst du auf deinem eigenen Rechner mit
+`ssh-keygen -t ed25519` einen erzeugen. Die Datei **ohne** `.pub` ist privat und
+bleibt auf diesem Rechner. In dieser Variante ist die Anmeldung per Passwort
+ausgeschaltet. Wähle bei der Installation entweder Schlüssel oder Passwort.
+
+Der iMac erzeugt beim ersten Start zusätzlich seinen eigenen SSH-Hostschlüssel
+und behält ihn auf dem Stick. Damit erkennt dein Rechner denselben iMac bei
+späteren Verbindungen wieder. Du musst diese Datei nicht selbst erstellen.
+
+### Verbinden und schalten
+
+Die IP-Adresse des iMac findest du in der Geräteliste deines Routers. Ersetze
+`IP-DES-IMAC` entsprechend und starte auf deinem anderen Rechner:
+
+```sh
+ssh tc@IP-DES-IMAC
+```
+
+Nach der Anmeldung schaltet `sudo /usr/local/bin/tdm_off` zurück zur internen
+Anzeige, `sudo /usr/local/bin/tdm_on` zum externen Eingang.
+Mit `sudo /usr/local/bin/tdm_shutdown` fährst du den iMac herunter.
+Der SSH-Zugang erlaubt auch administrative Befehle; teile Passwort oder privaten
+Schlüssel deshalb nur mit Personen, die den iMac verwalten dürfen.
+
+Im **Safe Console Mode** startet SSH nicht.
+Bei `--dry-run` werden die gewählten Pakete geprüft, aber kein Passwort abgefragt.
+Für eine Offline-Installation dieselben Optionen beim Herunterladen und beim
+Installieren angeben, zum Beispiel:
+
+```sh
+python3 install-usb.py --download-only downloaded-payload --keymap de --ssh-password
+sudo python3 install-usb.py --source downloaded-payload --device /dev/sdX --keymap de --ssh-password
+```
+
+Das Passwort wird erst bei der eigentlichen Installation festgelegt.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Install this repository onto an explicitly selected USB disk (Linux only)."""
 import argparse
+import base64
+import getpass
 import hashlib
 import json
 import os
@@ -17,6 +19,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = 'frogro/tinycore-tdm'
 REQUIRED = {'EFI/BOOT/BOOTX64.EFI', 'boot/vmlinuz', 'boot/corepure64.gz', 'boot/custom.gz', 'grub.cfg'}
+OPTIONAL = {'tce/optional/kmaps.tcz', 'tce/optional/dropbear.tcz'}
 COLUMNS = 'NAME,PATH,TYPE,SIZE,TRAN,RO,MODEL,SERIAL,MAJ:MIN,MOUNTPOINTS'
 
 
@@ -68,19 +71,24 @@ def describe(device):
             f"{(device.get('model') or '').strip()} | Seriennummer: {device.get('serial') or 'unbekannt'}")
 
 
-def manifest_entries(manifest):
+def manifest_entries(manifest, keymap="us", ssh=False):
     if not isinstance(manifest, dict) or manifest.get('version') != 1:
         raise ValueError('Unbekanntes Download-Manifest.')
     entries = manifest.get('files')
+    optional = manifest.get('optional_files', [])
+    if not isinstance(optional, list):
+        raise ValueError('Ungültige optionale Dateiliste.')
     if not isinstance(entries, list) or not 1 <= len(entries) <= 100:
         raise ValueError('Ungültige Dateiliste im Manifest.')
+    base_entries = entries
+    entries = entries + optional
     seen = set()
     for entry in entries:
         if not isinstance(entry, dict):
             raise ValueError('Ungültiger Dateieintrag.')
         name = entry.get('path', '')
         # Deliberately narrow: never accept personal backups or arbitrary paths.
-        if not isinstance(name, str) or name not in REQUIRED:
+        if not isinstance(name, str) or name not in REQUIRED | OPTIONAL:
             raise ValueError(f'Nicht erlaubter Installationspfad: {name!r}')
         if name in seen or not re.fullmatch(r'[0-9a-f]{64}', str(entry.get('sha256', ''))):
             raise ValueError('Doppelter Dateieintrag oder ungültige SHA-256-Prüfsumme.')
@@ -88,15 +96,18 @@ def manifest_entries(manifest):
         if type(size) is not int or not 0 < size <= 64 * 1024**2:
             raise ValueError('Ungültige Dateigröße.')
         seen.add(name)
-    if seen != REQUIRED:
+    if {e['path'] for e in base_entries} != REQUIRED or any(e['path'] not in OPTIONAL for e in optional):
         raise ValueError('Das Manifest enthält nicht alle benötigten Bootdateien.')
-    return entries
+    selected = REQUIRED | ({'tce/optional/kmaps.tcz'} if keymap == 'de' else set()) | ({'tce/optional/dropbear.tcz'} if ssh else set())
+    if not selected <= seen:
+        raise ValueError('Die Quelle enthält die gewählten Zusatzpakete nicht.')
+    return [e for e in entries if e['path'] in selected]
 
 
-def payload_files(root=ROOT):
+def payload_files(root=ROOT, keymap='us', ssh=False):
     manifest = json.loads((root / 'install-manifest.json').read_text())
     files = []
-    for entry in manifest_entries(manifest):
+    for entry in manifest_entries(manifest, keymap, ssh):
         path = root / entry['path']
         if path.is_symlink() or not path.is_file():
             raise ValueError(f'Bootdatei fehlt oder ist ein Symlink: {entry["path"]}')
@@ -115,7 +126,7 @@ def fetch(url, limit):
     return data
 
 
-def download_payload(destination, ref):
+def download_payload(destination, ref, keymap='us', ssh=False):
     # Resolve mutable branches/tags once, then fetch every file at that commit.
     if re.fullmatch(r'[0-9a-fA-F]{40}', ref):
         commit = ref.lower()
@@ -126,7 +137,7 @@ def download_payload(destination, ref):
             raise ValueError('GitHub lieferte keine gültige Commit-ID.')
     base = f'https://raw.githubusercontent.com/{REPOSITORY}/{commit}'
     raw = fetch(f'{base}/install-manifest.json', 64 * 1024)
-    entries = manifest_entries(json.loads(raw))
+    entries = manifest_entries(json.loads(raw), keymap, ssh)
     print(f'Download von {REPOSITORY}, Commit {commit}', flush=True)
     for entry in entries:
         name = entry['path']
@@ -139,7 +150,7 @@ def download_payload(destination, ref):
         path.write_bytes(data)
     (destination / 'install-manifest.json').write_bytes(raw)
     (destination / 'SOURCE-COMMIT.txt').write_text(commit + '\n')
-    return payload_files(destination)
+    return payload_files(destination, keymap, ssh)
 
 
 def digest(path):
@@ -148,6 +159,64 @@ def digest(path):
         for block in iter(lambda: stream.read(1024 * 1024), b''):
             result.update(block)
     return result.digest()
+
+
+def public_key(path):
+    data = path.read_text().strip()
+    parts = data.split()
+    if len(data) > 16384 or '\n' in data or len(parts) < 2 or parts[0] not in (
+            'ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521'):
+        raise ValueError('Bitte genau einen öffentlichen SSH-Schlüssel (.pub) angeben.')
+    try:
+        blob = base64.b64decode(parts[1], validate=True)
+        length = int.from_bytes(blob[:4], 'big')
+        if blob[4:4+length].decode() != parts[0] or len(blob) <= 4+length:
+            raise ValueError()
+    except (ValueError, UnicodeError):
+        raise ValueError('Ungültiger öffentlicher SSH-Schlüssel.') from None
+    return data + '\n'
+
+
+def password_hash():
+    if not shutil.which('openssl'):
+        raise ValueError('Für --ssh-password wird openssl benötigt.')
+    password = getpass.getpass('Neues SSH-Passwort für tc (mindestens 8 Zeichen): ')
+    if len(password) < 8 or any(c in password for c in '\r\n\0'):
+        raise ValueError('Passwort benötigt mindestens 8 Zeichen, ohne Zeilenumbrüche.')
+    if password != getpass.getpass('SSH-Passwort wiederholen: '):
+        raise ValueError('Passwörter stimmen nicht überein.')
+    result = run('openssl', 'passwd', '-6', '-stdin', input=password + '\n',
+                 capture_output=True, text=True)
+    hashed = result.stdout.strip()
+    if not re.fullmatch(r'\$6\$[./A-Za-z0-9]+\$[./A-Za-z0-9]{86}', hashed):
+        raise ValueError('Passwort konnte nicht verschlüsselt gespeichert werden.')
+    return hashed + '\n'
+
+
+def configure_payload(source, files, destination, keymap='us', key=None, hashed=None):
+    """Personalize a private copy only after verifying the distribution payload."""
+    for path in files:
+        target = destination / path.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+    grub = destination / 'grub.cfg'
+    text = re.sub(r'kmap=\S+', 'kmap=' + ('qwertz/de-latin1' if keymap == 'de' else 'us'), grub.read_text())
+    grub.write_text(text)
+    tce = destination / 'tce'
+    tce.mkdir(exist_ok=True)
+    packages = []
+    if keymap == 'de':
+        packages.append('kmaps.tcz')
+    if key is not None or hashed is not None:
+        packages.append('dropbear.tcz')
+        settings = tce / 'tdm'
+        settings.mkdir(mode=0o700)
+        (settings / 'ssh-mode').write_text('key\n' if key is not None else 'password\n')
+        credential = settings / ('authorized_keys' if key is not None else 'password.hash')
+        credential.write_text(key if key is not None else hashed)
+        credential.chmod(0o600)
+    (tce / 'onboot.lst').write_text(''.join(name + '\n' for name in packages))
+    return sorted(p for p in destination.rglob('*') if p.is_file())
 
 
 def install(device, files, root=ROOT):
@@ -206,7 +275,12 @@ def main(argv=None):
     parser.add_argument('--ref', default='main', help='GitHub-Branch, Tag oder Commit (Standard: main)')
     parser.add_argument('--source', type=Path, help='Statt Download ein lokales Verzeichnis mit Manifest verwenden')
     parser.add_argument('--download-only', type=Path, metavar='DIR', help='Nur herunterladen und prüfen; kein USB-Zugriff')
+    parser.add_argument('--keymap', choices=('us', 'de'), default='us', help='Tastaturlayout (Standard: us)')
+    auth = parser.add_mutually_exclusive_group()
+    auth.add_argument('--ssh-key', type=Path, metavar='PUBLIC_KEY.pub', help='SSH für tc mit öffentlichem Schlüssel aktivieren')
+    auth.add_argument('--ssh-password', action='store_true', help='SSH für tc mit interaktiv festgelegtem Passwort aktivieren')
     args = parser.parse_args(argv)
+    ssh = bool(args.ssh_key or args.ssh_password)
     if args.download_only:
         if args.device or args.source or args.list or args.dry_run:
             parser.error('--download-only ist nicht mit Geräte-/Quelloptionen kombinierbar')
@@ -217,9 +291,10 @@ def main(argv=None):
         with tempfile.TemporaryDirectory(prefix='.tinycore-download-', dir=destination.parent) as temporary:
             staging = Path(temporary) / 'payload'
             staging.mkdir()
-            download_payload(staging, args.ref)
+            download_payload(staging, args.ref, args.keymap, ssh)
             staging.rename(destination)
         print(f'Download vollständig geprüft: {destination}')
+        print('Bei der Offline-Installation dieselben Keymap-/SSH-Optionen erneut angeben.')
         return
     if not sys.platform.startswith('linux'):
         parser.error('Dieser Installer unterstützt Linux.')
@@ -251,24 +326,31 @@ def main(argv=None):
     with tempfile.TemporaryDirectory(prefix='tinycore-payload-') as temporary:
         if args.source:
             root = args.source.resolve()
-            files = payload_files(root)
+            files = payload_files(root, args.keymap, ssh)
         else:
-            root = Path(temporary)
-            files = download_payload(root, args.ref)
+            root = Path(temporary) / 'download'
+            root.mkdir()
+            files = download_payload(root, args.ref, args.keymap, ssh)
         if sum(p.stat().st_size for p in files) + 64 * 1024**2 > int(device['size']):
             raise ValueError('Nicht genügend Platz für die Bootdateien.')
+        key = public_key(args.ssh_key.expanduser()) if args.ssh_key else None
+        print(f'Tastatur: {args.keymap}; SSH: ' + ('Schlüssel' if key else 'Passwort' if ssh else 'aus'))
         print(describe(device))
         print('Plan: Alle Partitionen löschen; GPT + FAT32-ESP mit Label TINYCORE erstellen;')
         print(f'{len(files)} geprüfte Dateien kopieren, SHA-256 prüfen und aushängen.')
         if args.dry_run:
             print('Probelauf: Auf das USB-Laufwerk wurde nichts geschrieben.')
             return
+        hashed = password_hash() if args.ssh_password else None
         phrase = f'LOESCHEN {path}'
         if input(f'ALLE DATEN AUF {path} GEHEN VERLOREN. Zum Bestätigen "{phrase}" eingeben: ') != phrase:
             raise ValueError('Abgebrochen; nichts auf USB geschrieben.')
         # Revalidate downloads/local files before allowing destructive operations.
-        files = payload_files(root)
-        install(device, files, root)
+        files = payload_files(root, args.keymap, ssh)
+        configured = Path(temporary) / 'configured'
+        configured.mkdir(mode=0o700)
+        files = configure_payload(root, files, configured, args.keymap, key, hashed)
+        install(device, files, configured)
 
 
 if __name__ == '__main__':

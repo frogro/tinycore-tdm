@@ -1,0 +1,19 @@
+Title:          dropbear.tcz
+Description:    Small SSH server and client TESTING
+Version:        2020.80
+Author:         Matt Johnston
+Original-site:  https://matt.ucc.asn.au/dropbear/dropbear.html
+Copying-policy: Varying by code portion, see source tarball
+Size:		132K
+Extension_by:   bmarkus,jim
+Tags:           SECURITY CLI SSH
+Comments:       Binaries only
+                ----
+                Compiled for Core 11.0
+                ----
+                Use "sudo /usr/local/etc/init.d/dropbear start|stop|retart|status"
+                to manage service as root
+                add "/usr/local/etc/init.d/dropbear start" to /opt/bootlocal.sh to start at boot
+Change-log:     2014/09/28 First version, 2014.65
+                2015/05/23 Fix init script type-o (thanks to M.S. for reporting)
+Current:        2020/11/11 Update to 2020.80 compiled in key paths, xauth fix

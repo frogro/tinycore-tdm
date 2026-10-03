@@ -24,7 +24,7 @@ def build():
                ('usr/local', b'', stat.S_IFDIR | 0o755),
                ('usr/local/bin', b'', stat.S_IFDIR | 0o755)]
     for name, mode in [('etc/inittab', 0o644), ('opt/bootlocal.sh', 0o755),
-                       ('opt/ddc_diag.sh', 0o755)]:
+                       ('opt/ddc_diag.sh', 0o755), ('opt/ssh-start.sh', 0o755)]:
         data = (ROOT / name).read_bytes()
         if b'\r' in data:
             raise ValueError(f'{name}: expected Unix LF line endings')

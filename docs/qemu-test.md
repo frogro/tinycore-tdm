@@ -92,3 +92,14 @@ in QEMU, nicht die historische Firmwareauswahl des iMac. DisplayPort-Eingang,
 Bildumschaltung, Rückschalten und Helligkeit müssen am echten Gerät getestet werden.
 Die zwei alternativen grubx64.efi-Dateien wurden statisch untersucht, aber nicht
 als separate Firmware-Bootziele gestartet.
+
+## Installer-Optionen für Tastatur und SSH
+
+Die Installation mit `--keymap de --ssh-key …` wurde zusätzlich in QEMU/UEFI
+mit einem emulierten USB-Datenträger und E1000-Netzwerk gebootet. SSH-Anmeldung
+als `tc` mit einem temporären Ed25519-Schlüssel war erfolgreich;
+`/etc/sysconfig/keymap` meldete `qwertz/de-latin1`. Nach einem Neustart gelang
+auch eine Verbindung mit strikter Prüfung des zuvor gespeicherten Hostschlüssels.
+Die Passwortvariante wurde mit einem zufälligen Testpasswort und dem vom Installer
+erzeugten SHA-512-crypt-Hash geprüft. Testschlüssel und Passwörter liegen nicht
+im Repository. Diese Tests prüfen die Einrichtung, nicht die physische TDM-Umschaltung.

@@ -39,6 +39,19 @@ class DownloadTests(unittest.TestCase):
             for name, data in self.data.items():
                 self.assertEqual((destination / name).read_bytes(), data)
 
+    def test_optional_downloads_follow_selection(self):
+        self.manifest['optional_files'] = []
+        for name in sorted(installer.OPTIONAL):
+            data = ('optional:' + name).encode()
+            self.data[name] = data
+            self.manifest['optional_files'].append(dict(path=name, size=len(data), sha256=hashlib.sha256(data).hexdigest()))
+        for layout, ssh, count in [('us', False, 5), ('de', False, 6), ('us', True, 6), ('de', True, 7)]:
+            with self.subTest(layout=layout, ssh=ssh), tempfile.TemporaryDirectory() as tmp, patch.object(installer, 'fetch', side_effect=self.fake_fetch):
+                root = Path(tmp)
+                self.assertEqual(len(installer.download_payload(root, 'main', layout, ssh)), count)
+                self.assertEqual((root / 'tce/optional/kmaps.tcz').exists(), layout == 'de')
+                self.assertEqual((root / 'tce/optional/dropbear.tcz').exists(), ssh)
+
     def test_invalid_manifest_paths_duplicates_and_missing_files(self):
         for name in ['../../etc/shadow', '/etc/shadow', 'tce/mydata.tgz', 'boot/../grub.cfg']:
             manifest = copy.deepcopy(self.manifest)

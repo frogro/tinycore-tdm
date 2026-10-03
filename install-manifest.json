@@ -18,13 +18,25 @@
     },
     {
       "path": "boot/custom.gz",
-      "size": 7397,
-      "sha256": "5c34951cdab5d4df2ce50b0099d08b279d973528942afbfbf67ac1ff1fcadacc"
+      "size": 7653,
+      "sha256": "5ad9eef62866f6c5431b4f8ca7f73684944606d006a53e45fbe496665067378e"
     },
     {
       "path": "grub.cfg",
-      "size": 499,
-      "sha256": "b5cf53fcdf90482041f03e66f4f38f08ca338ef13ceda5e6090d964b83adfc22"
+      "size": 471,
+      "sha256": "7087143e29a5774e6bc1e38f372fb658e4725ac5da6eeb82dba6af79638a4504"
+    }
+  ],
+  "optional_files": [
+    {
+      "path": "tce/optional/kmaps.tcz",
+      "size": 155648,
+      "sha256": "d0ee968165b98ccc230ae6405d836277db6591d5a180213bff5194b5a7ba2eec"
+    },
+    {
+      "path": "tce/optional/dropbear.tcz",
+      "size": 135168,
+      "sha256": "e8077d848a26224d444dcb77b46707a0068e39ef6d895b05351301a89194b0ab"
     }
   ]
 }
